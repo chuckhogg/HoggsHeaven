@@ -337,23 +337,16 @@ export const adminState = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     await noStore();
-    const sql = await db();
-    const current = await ownerId(sql);
-    return { ownerExists: Boolean(current), isOwner: current === context.userId };
+    const { deskStateFor } = await import("@/lib/desk-access.server");
+    return deskStateFor(await db(), context.userId, process.env);
   });
 
 export const claimDesk = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     await noStore();
-    const sql = await db();
-    const current = await ownerId(sql);
-    if (current && current !== context.userId) throw new Error("This farm desk belongs to another account.");
-    if (!current) {
-      await sql`insert into shop_owner (id, user_id) values (1, ${context.userId})`;
-      await sql`update orders set owner_user_id = ${context.userId} where owner_user_id = 'pending'`;
-    }
-    return { ok: true };
+    const { claimDeskFor } = await import("@/lib/desk-access.server");
+    return claimDeskFor(await db(), context.userId, process.env);
   });
 
 export const listAdminOrders = createServerFn({ method: "GET" })

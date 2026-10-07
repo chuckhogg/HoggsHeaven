@@ -30,12 +30,21 @@ function AdminPage() {
 
 function Desk() {
   const [tab, setTab] = useState<"orders" | "listings">("orders");
-  const [state, setState] = useState<"loading" | "claim" | "denied" | "open">("loading");
+  const [state, setState] = useState<"loading" | "claim" | "refused" | "denied" | "open">("loading");
   const [error, setError] = useState("");
+  const [refusal, setRefusal] = useState("");
 
   useEffect(() => {
     adminState()
-      .then((next) => setState(!next.ownerExists ? "claim" : next.isOwner ? "open" : "denied"))
+      .then((next) => {
+        if (next.isOwner) setState("open");
+        else if (next.ownerExists) setState("denied");
+        else if (next.canClaim) setState("claim");
+        else {
+          setRefusal(next.refusal ?? "This account cannot claim the farm desk.");
+          setState("refused");
+        }
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "The desk did not open."));
   }, []);
 
@@ -68,6 +77,7 @@ function Desk() {
           </button>
         </div>
       ) : null}
+      {state === "refused" ? <p className="mt-4 max-w-lg">{refusal}</p> : null}
       {state === "denied" ? <p className="mt-4">This farm desk belongs to another account.</p> : null}
       {state === "open" ? (
         <div className="mt-4">

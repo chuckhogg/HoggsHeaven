@@ -59,9 +59,14 @@ function LoginPage() {
             {pending ? "Working…" : mode === "up" ? "Create account" : "Sign in"}
           </button>
         </form>
-        <button type="button" className="mt-3 text-sm font-semibold text-barn" onClick={() => { setMode(mode === "up" ? "in" : "up"); setError(""); }}>
-          {mode === "up" ? "I already have a login" : "First time? Create the desk login"}
-        </button>
+        {/* Deployed stores refuse new password accounts (see farm-access.ts); the owner uses Google. */}
+        {import.meta.env.DEV ? (
+          <button type="button" className="mt-3 text-sm font-semibold text-barn" onClick={() => { setMode(mode === "up" ? "in" : "up"); setError(""); }}>
+            {mode === "up" ? "I already have a login" : "First time? Create the desk login"}
+          </button>
+        ) : (
+          <p className="mt-3 text-sm text-muted">First time here? Use Continue with Google below.</p>
+        )}
         <div className="mt-5 space-y-2">
           {GROK_PROVIDERS.map((provider) => (
             <button
