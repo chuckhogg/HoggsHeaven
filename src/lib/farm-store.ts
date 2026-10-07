@@ -28,7 +28,8 @@ export type Order = {
   customer: { name: string; email: string; phone: string };
   method: "pickup" | "ship";
   address: string;
-  payment: { type: "card-sandbox"; last4: string; brand: string } | { type: "pay-at-pickup" };
+  // Card charges stay on Stripe or Square. No card data is ever stored here.
+  payment: { type: "pay-at-pickup" };
   status: OrderStatus;
   history: { at: string; status: OrderStatus; note: string }[];
   items: CartItem[];

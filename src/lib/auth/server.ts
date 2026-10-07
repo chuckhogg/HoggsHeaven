@@ -37,6 +37,7 @@ import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
+import { farmAccountLinking, passwordSignUpAllowed } from "./farm-access";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
@@ -184,24 +185,15 @@ export const auth = betterAuth({
   // local loopback variants, or clients get "Invalid origin".
   trustedOrigins,
 
-  // Encrypt broker-issued OAuth tokens at rest, and treat the broker's upstreams
-  // as trusted first-party identities. The broker owns identity and X emails are
-  // synthetic/unverified, so WITHOUT this a login can fail with
-  // `account_not_linked` (Better Auth refuses to attach an untrusted, unverified
-  // identity to an existing user). Google and X carry DISTINCT emails, so this
-  // never merges them into one user — they stay separate identities.
+  // Encrypt broker-issued OAuth tokens at rest. Account linking follows the
+  // farm policy in `./farm-access`: an OAuth identity only joins an existing
+  // same-email user whose email is VERIFIED, and only Google (plus the
+  // platform gate) is trusted to vouch for its email. X emails are synthetic,
+  // so X is not trusted. Without this, anyone could pre-register the owner's
+  // Gmail with a password and capture the owner's later Google sign-in.
   account: {
     encryptOAuthTokens: true,
-    accountLinking: {
-      enabled: true,
-      trustedProviders: [
-        ...GROK_PROVIDERS.map((p) => p.providerId),
-        GATE_PROVIDER_ID,
-      ],
-      // X's synthetic email is never "verified", so don't gate linking on the
-      // local user's email-verified state.
-      requireLocalEmailVerified: false,
-    },
+    accountLinking: farmAccountLinking([GATE_PROVIDER_ID]),
   },
 
   // Cache the session in the short-lived signed `session_data` cookie so reads
@@ -211,7 +203,16 @@ export const auth = betterAuth({
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+  // Deployed stores refuse NEW password accounts (no mailer to verify them, so
+  // a sign-up could only squat an address); local dev and preview keep it.
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          disableSignUp: !passwordSignUpAllowed(process.env),
+        },
+      }
+    : {}),
 
   // `__Host-` prefixed cookies: the browser REFUSES any same-named cookie that
   // carries a `Domain` attribute, so a sibling `*.grok.me` app cannot "toss" a
