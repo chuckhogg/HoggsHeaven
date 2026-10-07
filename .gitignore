@@ -13,3 +13,7 @@ screenshots
 .node_modules.lock
 # Order exports hold customer details. Pass their path to import:orders; never commit them.
 *.csv
+
+# Cloudflare / wrangler local state and secrets
+.wrangler
+.dev.vars*

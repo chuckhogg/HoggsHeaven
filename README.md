@@ -47,6 +47,20 @@ npm run build
 
 A real Google sign-in through the shared preview sign-in client only works on a `*.grok-sandbox.com` preview host, because that client is registered only for `https://*.grok-sandbox.com/api/auth/oauth2/callback/*` (see `src/lib/auth/preview.ts`). On `localhost`, the Google button still reaches the sign-in broker, but its return address is `http://localhost:8080/...`, which that client doesn't allow. A deployed store uses its own sign-in client and `BETTER_AUTH_URL` instead.
 
+## Dev site on Cloudflare Pages
+
+`https://dev.hoggsheaven.farm` runs the `dev-preview` branch on the Cloudflare Pages project `hoggsheaven`. Every response carries `X-Robots-Tag: noindex, nofollow`. The Vercel setup (`vercel.json`, the default `vercel` Nitro preset) is unchanged.
+
+```sh
+npm run build:cloudflare-dev        # NITRO_PRESET=cloudflare-pages SITE_NOINDEX=true vite build -> dist/
+wrangler pages deploy dist --project-name hoggsheaven --branch dev-preview
+```
+
+`wrangler.jsonc` holds the Pages settings (`nodejs_compat`) and the plain variables (`NODE_ENV=production`, `BETTER_AUTH_URL`, `FARM_OWNER_EMAILS`). Secrets are set only in Cloudflare with `wrangler pages secret put <NAME> --project-name hoggsheaven`: `BETTER_AUTH_SECRET` now, and `DATABASE_URL`, `GROK_AUTH_CLIENT_ID` and `GROK_AUTH_CLIENT_SECRET` once they exist.
+
+- **Database:** the Workers runtime can't run the in-memory PGLite fallback, so the shop, checkout, order tracking and sign-in need a real Postgres `DATABASE_URL` (for example Neon). Run `npm run db:migrate` against it first. On Workers each query opens its own connection (`src/lib/pg-config.ts`), because Workers won't reuse a socket across requests.
+- **Google sign-in:** needs a Grok auth client registered for `https://dev.hoggsheaven.farm/api/auth/oauth2/callback/grok-google`. The built-in preview client only accepts `*.grok-sandbox.com`.
+
 ## Importing historical orders
 
 `scripts/import-orders.mjs` is a one-time import of the old GoDaddy Online Store and eBay order export (CSV) into the `orders` and `order_items` tables. It writes rows directly, so each order keeps its original date, subtotal, shipping, tax, total, status and line items. Nothing is recalculated.

@@ -170,11 +170,21 @@ export default defineConfig(({ command, isPreview }) => ({
     ...(command === "build" || isPreview
       ? [
           nitro({
-            preset: "vercel",
+            // Vercel stays the default. `NITRO_PRESET=cloudflare-pages` builds
+            // the Cloudflare Pages dev site (see wrangler.jsonc / README).
+            preset: process.env.NITRO_PRESET || "vercel",
             // Auto-registers server/middleware/* (the PWA install page +
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // Cloudflare Pages: wrangler.jsonc in the repo root is the deploy
+            // config, so Nitro doesn't write its own copy into dist/.
+            cloudflare: { deployConfig: false, nodeCompat: true },
+            // `SITE_NOINDEX=true` (the dev.hoggsheaven.farm build) asks search
+            // engines to skip every page and file. Leave it unset for the live store.
+            ...(process.env.SITE_NOINDEX === "true"
+              ? { routeRules: { "/**": { headers: { "x-robots-tag": "noindex, nofollow" } } } }
+              : {}),
           }),
         ]
       : []),

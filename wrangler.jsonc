@@ -1,0 +1,21 @@
+// Cloudflare Pages config for the dev site at https://dev.hoggsheaven.farm.
+// Vercel config (vercel.json) is untouched; this file only matters to wrangler.
+//
+// Build and deploy (Node 22+):
+//   NITRO_PRESET=cloudflare-pages SITE_NOINDEX=true node scripts/with-app-env.mjs vite build
+//   wrangler pages deploy dist --project-name hoggsheaven --branch dev-preview
+//
+// Secrets live only in Cloudflare (`wrangler pages secret put <NAME> --project-name hoggsheaven`):
+//   BETTER_AUTH_SECRET (set), DATABASE_URL, GROK_AUTH_CLIENT_ID, GROK_AUTH_CLIENT_SECRET (not set yet).
+{
+  "name": "hoggsheaven",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    // Deployed mode: email/password sign-up is refused and the desk needs FARM_OWNER_EMAILS.
+    "NODE_ENV": "production",
+    "BETTER_AUTH_URL": "https://dev.hoggsheaven.farm",
+    "FARM_OWNER_EMAILS": "chuckhogg@gmail.com"
+  }
+}

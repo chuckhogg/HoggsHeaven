@@ -11,6 +11,7 @@
     "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "import:orders": "node --experimental-strip-types scripts/import-orders.mjs",
+    "build:cloudflare-dev": "NITRO_PRESET=cloudflare-pages SITE_NOINDEX=true node scripts/with-app-env.mjs vite build",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
     "preview:restart": "node scripts/preview.mjs restart",
