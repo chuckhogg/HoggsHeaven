@@ -34,12 +34,8 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
       <header className="sticky top-0 z-20 border-b border-line bg-cream/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <Link to="/" className="mr-auto flex items-center gap-3">
-            <img src={LOGO_URL} alt="Hogg's Heaven Farm" className="size-14 rounded-full object-cover" />
-            <span>
-              <strong className="block font-display text-xl leading-none">Hogg's Heaven Farm</strong>
-              <span className="text-xs uppercase tracking-widest text-muted">Shelbyville, KY</span>
-            </span>
+          <Link to="/" className="mr-auto flex items-center">
+            <img src={LOGO_URL} alt="Hogg's Heaven Farm" className="h-12 w-auto object-contain sm:h-16" />
           </Link>
           <button
             type="button"

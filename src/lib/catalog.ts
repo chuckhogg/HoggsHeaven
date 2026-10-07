@@ -498,7 +498,7 @@ export const products: Product[] = [
   }
 ];
 
-export const LOGO_URL = "https://img1.wsimg.com/isteam/ip/8c59a9b8-be4d-43d3-99a6-a9c6c6896258/Hogg%27s%20Heaven%20Farm.png";
+export const LOGO_URL = "/logo.png";
 
 export const reviews: { name: string; date: string; text: string }[] = [
   {

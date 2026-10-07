@@ -16,7 +16,7 @@ function AboutPage() {
           <p>It is still a husband-and-wife team, focused on healthy birds that represent the breed. The flock includes Ayam Cemani, American Bresse, Black Copper Marans, French Wheaten Marans, Gold Deathlayers, and Pita Pintas.</p>
         </div>
         <aside className="rounded-card border border-line bg-paper p-5">
-          <img src={LOGO_URL} alt="Hogg's Heaven Farm badge" className="size-40 rounded-full object-cover" />
+          <img src={LOGO_URL} alt="Hogg's Heaven Farm" className="h-24 w-auto max-w-full object-contain" />
           <h2 className="mt-4 text-2xl">Visit</h2>
           <p className="mt-2 text-muted">
             Shelbyville, Kentucky 40065
