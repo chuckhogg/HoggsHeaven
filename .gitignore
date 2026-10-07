@@ -11,3 +11,5 @@ artifacts
 screenshots
 *.log
 .node_modules.lock
+# Order exports hold customer details. Pass their path to import:orders; never commit them.
+*.csv
