@@ -9,7 +9,7 @@ const links = [
   { to: "/shop", label: "Shop", exact: false },
   { to: "/about", label: "About", exact: true },
   { to: "/track", label: "Track order", exact: true },
-  { to: "/desk", label: "Farm desk", exact: true },
+  { to: "/admin", label: "Admin", exact: true },
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {

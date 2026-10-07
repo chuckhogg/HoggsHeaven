@@ -1,24 +1,64 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Shell } from "@/components/shell";
-import { hydrateFarm, money, statusLabel, useFarm } from "@/lib/farm-store";
+import { hydrateFarm, money, saveReceipt, statusLabel, useFarm } from "@/lib/farm-store";
+import { trackOrder } from "@/lib/shop.functions";
 
 export const Route = createFileRoute("/order/$id")({ component: OrderPage });
 
-export function OrderBody({ id }: { id: string }) {
+export function OrderBody({ id, email }: { id: string; email?: string }) {
   const farm = useFarm();
   const [ready, setReady] = useState(false);
+  const [typed, setTyped] = useState(email ?? "");
+  const [miss, setMiss] = useState(false);
   useEffect(() => {
     hydrateFarm();
     setReady(true);
   }, []);
+  const local = farm.orders.find((item) => item.id.toLowerCase() === id.toLowerCase());
+  const lookupEmail = typed || local?.customer.email || "";
+
+  const hasLocal = Boolean(local);
+
+  useEffect(() => {
+    if (!lookupEmail) return;
+    let live = true;
+    trackOrder({ data: { id, email: lookupEmail } })
+      .then((order) => {
+        if (!live) return;
+        if (order) {
+          saveReceipt(order);
+          setMiss(false);
+        } else if (!hasLocal) setMiss(true);
+      })
+      .catch(() => {
+        if (live && !hasLocal) setMiss(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [id, lookupEmail, hasLocal]);
+
   const order = farm.orders.find((item) => item.id.toLowerCase() === id.toLowerCase());
   if (!ready) return <p className="text-muted">Looking up the order…</p>;
   if (!order) {
     return (
       <div>
-        <h1 className="text-4xl">Order not on this browser</h1>
-        <p className="mt-3 max-w-xl text-muted">Tracking is saved on the browser that placed the order. Open the farm desk there, or place a test order.</p>
+        <h1 className="text-4xl">Find this order</h1>
+        <p className="mt-3 max-w-xl text-muted">Enter the email used at checkout. The order number alone is not enough.</p>
+        <form
+          className="mt-4 max-w-md"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget as HTMLFormElement);
+            setTyped(String(data.get("email") || ""));
+          }}
+        >
+          <label className="text-sm font-semibold" htmlFor="email">Email</label>
+          <input id="email" name="email" type="email" required className="mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3" />
+          <button type="submit" className="mt-3 inline-flex min-h-11 items-center rounded-full bg-barn px-5 font-semibold text-paper">Look up</button>
+        </form>
+        {miss ? <p className="mt-3 text-sm text-barn">No order matches that email.</p> : null}
         <Link to="/track" className="mt-4 inline-flex font-semibold text-barn">Track</Link>
       </div>
     );
@@ -43,7 +83,7 @@ export function OrderBody({ id }: { id: string }) {
           ))}
           <div className="mt-3 flex justify-between font-semibold"><span>Total</span><span>{money(order.totals.total)}</span></div>
           <p className="mt-2 text-sm text-muted">
-            {order.payment.type === "card-sandbox" ? `${order.payment.brand} ···· ${order.payment.last4}` : "Pay at pickup"} · {order.method === "ship" ? "Ship" : "Pickup"}
+            {order.status === "awaiting-payment" ? "Payment due at pickup or by invoice." : "Payment recorded by the farm."} No card number is stored. · {order.method === "ship" ? "Ship" : "Pickup"}
           </p>
           <p className="text-sm">{order.address}</p>
           <button type="button" className="mt-3 text-sm font-semibold text-barn" onClick={() => window.print()}>Print receipt</button>

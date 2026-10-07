@@ -1,19 +1,25 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { products } from "@/lib/catalog";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { addToCart, money } from "@/lib/farm-store";
+import { useCatalog } from "@/lib/use-catalog";
 import { Shell } from "@/components/shell";
-import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/product/$slug")({ component: ProductPage });
 
 function ProductPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
+  const { products, ready } = useCatalog();
   const product = products.find((item) => item.slug === slug);
   const first = product?.variants.find((variant) => variant.stock !== 0) ?? product?.variants[0];
-  const [variantId, setVariantId] = useState(first?.id ?? 0);
+  const [variantId, setVariantId] = useState(0);
   const [qty, setQty] = useState(1);
+  useEffect(() => {
+    if (first && variantId === 0) setVariantId(first.id);
+  }, [first, variantId]);
+  if (!ready) {
+    return <Shell><p className="text-muted">Loading the listing…</p></Shell>;
+  }
   if (!product || !first) {
     return (
       <Shell>

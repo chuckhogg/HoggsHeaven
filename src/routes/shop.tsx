@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { products } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { Shell } from "@/components/shell";
+import { useCatalog } from "@/lib/use-catalog";
 
 type Filter = "all" | "eggs" | "birds" | "sale";
 
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/shop")({
 
 function ShopPage() {
   const { f } = Route.useSearch();
+  const { products, ready, error } = useCatalog();
   const items = products.filter((product) => {
     if (f === "eggs" || f === "birds") return product.kind === f;
     if (f === "sale") return product.variants.some((variant) => variant.compare);
@@ -52,6 +53,8 @@ function ShopPage() {
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {!ready ? <p className="text-muted">Loading the flock…</p> : null}
+        {error ? <p className="text-barn">{error}</p> : null}
         {items.map((product) => (
           <ProductCard key={product.slug} product={product} />
         ))}

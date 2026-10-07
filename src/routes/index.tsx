@@ -1,17 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { products, reviews } from "@/lib/catalog";
+import { reviews } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { Shell } from "@/components/shell";
+import { useCatalog } from "@/lib/use-catalog";
 
 export const Route = createFileRoute("/")({ component: Home });
 
-function pick(slug: string) {
-  return products.find((product) => product.slug === slug) ?? products[0];
-}
-
 function Home() {
+  const { products, ready } = useCatalog();
   const featured = products.filter((product) => /ayam|bresse|maran|death|pita/i.test(product.name)).slice(0, 6);
-  const hero = [pick("ayam-cemani"), pick("white-bresse-hatching-eggs"), pick("black-copper-maran-blc-cpp-mrn")];
+  const shown = featured.length > 0 ? featured : products.slice(0, 6);
+  const hero = [
+    products.find((product) => product.slug === "ayam-cemani"),
+    products.find((product) => product.slug === "white-bresse-hatching-eggs"),
+    products.find((product) => product.slug === "black-copper-maran-blc-cpp-mrn"),
+  ].map((product, index) => product ?? products[index]);
   return (
     <Shell>
       <section className="grid items-center gap-8 md:grid-cols-2">
@@ -31,9 +34,15 @@ function Home() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <img src={hero[0].image} alt={hero[0].name} className="col-span-1 row-span-2 h-full min-h-72 w-full rounded-card object-cover" />
-          <img src={hero[1].image} alt={hero[1].name} className="h-40 w-full rounded-card object-cover md:h-52" />
-          <img src={hero[2].image} alt={hero[2].name} className="h-40 w-full rounded-card object-cover md:h-52" />
+          {ready && hero[0] && hero[1] && hero[2] ? (
+            <>
+              <img src={hero[0].image} alt={hero[0].name} className="col-span-1 row-span-2 h-full min-h-72 w-full rounded-card object-cover" />
+              <img src={hero[1].image} alt={hero[1].name} className="h-40 w-full rounded-card object-cover md:h-52" />
+              <img src={hero[2].image} alt={hero[2].name} className="h-40 w-full rounded-card object-cover md:h-52" />
+            </>
+          ) : (
+            <div className="col-span-2 min-h-72 rounded-card bg-paper" />
+          )}
         </div>
       </section>
       <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -55,7 +64,7 @@ function Home() {
           <Link to="/shop" search={{ f: "all" }} className="font-semibold text-barn">View all</Link>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((product) => (
+          {shown.map((product) => (
             <ProductCard key={product.slug} product={product} />
           ))}
         </div>
