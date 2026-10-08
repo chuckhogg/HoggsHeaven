@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Menu, Phone, ShoppingBag, X } from "lucide-react";
+import { Mail, Menu, ShoppingBag, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { LOGO_URL } from "@/lib/catalog";
 import { cartCount, hydrateFarm, useFarm } from "@/lib/farm-store";
@@ -26,9 +26,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="bg-ink text-cream">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
           <span>Shelbyville, Kentucky · Farm pickup or USPS/UPS shipping</span>
-          <a className="inline-flex items-center gap-2" href="tel:+15024356649">
-            <Phone className="size-4" aria-hidden />
-            502-435-6649
+          <a className="inline-flex items-center gap-2" href="mailto:farm@hoggs.org">
+            <Mail className="size-4" aria-hidden />
+            farm@hoggs.org
           </a>
         </div>
       </div>
@@ -88,9 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <p className="mt-2 text-cream/80">
               Shelbyville, Kentucky 40065
               <br />
-              <a href="tel:+15024356649">502-435-6649</a>
-              <br />
-              <a href="mailto:chuckhogg@gmail.com">chuckhogg@gmail.com</a>
+              <a href="mailto:farm@hoggs.org">farm@hoggs.org</a>
             </p>
           </div>
           <div className="text-sm">

@@ -104,7 +104,7 @@ function ProductPage() {
                 <li key={method.slug} className="flex justify-between gap-3"><span>{method.name}</span><span>{money(method.price ?? 0)}</span></li>
               ))}
             </ul>
-            {shipsBy.length === 0 ? <p className="mt-1 text-muted">Shipping isn't available for this listing yet. Call 502-435-6649 to ask.</p> : null}
+            {shipsBy.length === 0 ? <p className="mt-1 text-muted">Shipping isn't available for this listing yet. Email <a className="text-barn" href="mailto:farm@hoggs.org">farm@hoggs.org</a> to ask.</p> : null}
           </div>
           <p className="mt-6 whitespace-pre-wrap text-muted">{product.description}</p>
         </div>

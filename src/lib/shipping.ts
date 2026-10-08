@@ -133,7 +133,7 @@ export function cartShipping(lines: CartShippingLine[], methods: ShippingMethod[
   return {
     options,
     waiting,
-    reason: `Shipping rates for ${groups} aren't set yet, so this order is farm pickup only for now. Call 502-435-6649 to arrange shipping.`,
+    reason: `Shipping rates for ${groups} aren't set yet, so this order is farm pickup only for now. Email farm@hoggs.org to arrange shipping.`,
   };
 }
 

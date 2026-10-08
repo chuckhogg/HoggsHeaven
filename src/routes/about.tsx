@@ -11,7 +11,7 @@ function AboutPage() {
         <div className="space-y-4 text-lg">
           <p className="text-xs font-semibold uppercase tracking-widest text-barn">About us</p>
           <h1 className="text-4xl">Hogg's Heaven Farm</h1>
-          <p>Chuck and Angela Hogg started the farm on a five-acre plot in Shelby County, Kentucky. The land began as a family playground. By 2018 Angela and Hannah were adding chicks and ducklings, and by 2019 they were searching for rare breeds that were hard to find in Kentucky.</p>
+          <p>A husband-and-wife team started the farm on a five-acre plot in Shelby County, Kentucky. The land began as a family playground. By 2018 Angela and Hannah were adding chicks and ducklings, and by 2019 they were searching for rare breeds that were hard to find in Kentucky.</p>
           <p>In 2020 the farm added two Bulgarian Shepherds, Athena and Apollo. Their first litter arrived in 2022. Demand grew with them: customers drive in from hours away, and hatching eggs now ship.</p>
           <p>It is still a husband-and-wife team, focused on healthy birds that represent the breed. The flock includes Ayam Cemani, American Bresse, Black Copper Marans, French Wheaten Marans, Gold Deathlayers, and Pita Pintas.</p>
         </div>
@@ -23,9 +23,7 @@ function AboutPage() {
             <br />
             Message ahead for a farm visit.
             <br />
-            <a className="text-barn" href="tel:+15024356649">502-435-6649</a>
-            <br />
-            <a className="text-barn" href="mailto:chuckhogg@gmail.com">chuckhogg@gmail.com</a>
+            <a className="text-barn" href="mailto:farm@hoggs.org">farm@hoggs.org</a>
           </p>
           <p className="mt-3">
             <a className="font-semibold text-barn" href="https://www.facebook.com/hoggsheaven" target="_blank" rel="noreferrer">Facebook</a>

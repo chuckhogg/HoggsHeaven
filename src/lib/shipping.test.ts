@@ -26,7 +26,7 @@ const moreEggs = { name: "Ayam Cemani Hatching Eggs", category: "eggs" as const,
 const chicks = { name: "MARSBAR", category: "chicks" as const, shipping: [...DEFAULT_METHODS.chicks] };
 const adult = { name: "Lavender Orpington", category: "adult" as const, shipping: [...DEFAULT_METHODS.adult] };
 
-test("default assignments follow Chuck's shipping rules", () => {
+test("default assignments follow the farm's shipping rules", () => {
   assert.deepEqual(DEFAULT_METHODS.adult, ["usps-priority-express"]);
   assert.deepEqual(DEFAULT_METHODS.chicks, ["usps-priority", "usps-priority-express"]);
   assert.deepEqual(DEFAULT_METHODS.eggs, ["usps-priority", "ups-ground", "ups-3-day", "ups-2-day", "ups-next-day"]);
@@ -65,6 +65,8 @@ test("live birds ship via Priority Mail Express once it has a price", () => {
   const before = cartShipping([adult], methods());
   assert.deepEqual(before.options, []);
   assert.match(before.reason, /Shipping rates for adult birds aren't set yet/);
+  assert.match(before.reason, /Email farm@hoggs\.org to arrange shipping\./);
+  assert.doesNotMatch(before.reason, /\d{3}-\d{4}/);
   assert.deepEqual(before.waiting.map((m) => m.slug), ["usps-priority-express"]);
   const after = cartShipping([adult], methods({ "usps-priority-express": 65 }));
   assert.deepEqual(after.options.map((o) => [o.slug, o.price]), [["usps-priority-express", 65]]);
