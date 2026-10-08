@@ -16,6 +16,9 @@
  *   --skip <ids>      comma-separated order numbers to leave out
  *   --json            print the summary as JSON
  *
+ * Driver: Neon hosts (*.neon.tech) connect over Neon's WebSocket driver on
+ * port 443; other hosts use node-postgres. Override with IMPORT_DB_DRIVER=pg|neon.
+ *
  * Without DATABASE_URL only --dry-run is allowed; it runs against a throwaway
  * in-memory PGlite database with migrations/*.sql applied.
  *
@@ -70,17 +73,55 @@ export function parseArgs(argv) {
 }
 
 /**
+ * Which Postgres driver to use for DATABASE_URL.
+ *
+ * - `IMPORT_DB_DRIVER=pg` or `=neon` forces one.
+ * - Otherwise a Neon host (`*.neon.tech`) uses Neon's serverless driver, which
+ *   speaks the same protocol over a WebSocket on port 443 (works where outbound
+ *   5432 is blocked); anything else uses node-postgres.
+ * Both give a single dedicated session, so BEGIN … COMMIT behaves the same.
+ * @param {string} url
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {"pg" | "neon"}
+ */
+export function pickDriver(url, env = process.env) {
+  const forced = env.IMPORT_DB_DRIVER?.trim().toLowerCase();
+  if (forced === "pg" || forced === "neon") return forced;
+  if (forced) throw new Error(`IMPORT_DB_DRIVER must be "pg" or "neon", not "${forced}"`);
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return "pg";
+  }
+  return host.endsWith(".neon.tech") ? "neon" : "pg";
+}
+
+/**
  * @returns {Promise<{ client: import("./import-orders-lib.mjs").QueryClient, label: string, close: () => Promise<void> }>}
  */
 async function openDatabase() {
   const url = process.env.DATABASE_URL?.trim();
   if (url) {
-    const { default: pg } = await import("pg");
-    const client = new pg.Client({ connectionString: url });
+    const driver = pickDriver(url);
+    /** @type {{ connect: () => Promise<unknown>, query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }>, end: () => Promise<void> }} */
+    let client;
+    if (driver === "neon") {
+      if (typeof globalThis.WebSocket !== "function") {
+        throw new Error(
+          "Neon's WebSocket driver needs Node 22+ (global WebSocket). Upgrade Node or set IMPORT_DB_DRIVER=pg.",
+        );
+      }
+      const { Client } = await import("@neondatabase/serverless");
+      client = new Client({ connectionString: url });
+    } else {
+      const { default: pg } = await import("pg");
+      client = new pg.Client({ connectionString: url });
+    }
     await client.connect();
     return {
       client: { query: async (text, params) => (await client.query(text, params)).rows },
-      label: "DATABASE_URL",
+      label: `DATABASE_URL (${driver === "neon" ? "Neon WebSocket driver, port 443" : "node-postgres"})`,
       close: () => client.end(),
     };
   }

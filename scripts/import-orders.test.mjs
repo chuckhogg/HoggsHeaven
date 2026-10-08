@@ -24,7 +24,7 @@ import {
   importOrders,
   summarize,
 } from "./import-orders-lib.mjs";
-import { parseArgs } from "./import-orders.mjs";
+import { parseArgs, pickDriver } from "./import-orders.mjs";
 import { pendingMigrations } from "./migration-plan.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -663,4 +663,15 @@ test("CLI dry run without DATABASE_URL uses a throwaway PGlite and prints a JSON
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("pickDriver: Neon hosts use the WebSocket driver, others node-postgres, env overrides", () => {
+  const neonUrl = "postgresql://u:p@ep-x-pooler.us-east-2.aws.neon.tech/db?sslmode=require";
+  assert.equal(pickDriver(neonUrl, {}), "neon");
+  assert.equal(pickDriver("postgres://u:p@localhost:5432/db", {}), "pg");
+  assert.equal(pickDriver("postgres://u:p@db.example.com/db", {}), "pg");
+  assert.equal(pickDriver("not a url", {}), "pg");
+  assert.equal(pickDriver(neonUrl, { IMPORT_DB_DRIVER: "pg" }), "pg");
+  assert.equal(pickDriver("postgres://localhost/db", { IMPORT_DB_DRIVER: "NEON" }), "neon");
+  assert.throws(() => pickDriver(neonUrl, { IMPORT_DB_DRIVER: "mysql" }), /IMPORT_DB_DRIVER/);
 });
