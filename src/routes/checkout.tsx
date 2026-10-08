@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Shell } from "@/components/shell";
 import { cartTotals, clearCart, hydrateFarm, money, saveReceipt, useFarm } from "@/lib/farm-store";
 import { placeShopOrder } from "@/lib/shop.functions";
+import { cartShipping, parseCategory } from "@/lib/shipping";
 import { useCatalog } from "@/lib/use-catalog";
 
 export const Route = createFileRoute("/checkout")({ component: CheckoutPage });
@@ -12,7 +13,7 @@ function CheckoutPage() {
   const catalog = useCatalog();
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
-  const [method, setMethod] = useState<"pickup" | "ship">("pickup");
+  const [choice, setChoice] = useState("pickup");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const placed = useRef(false);
@@ -23,7 +24,27 @@ function CheckoutPage() {
   useEffect(() => {
     if (ready && farm.cart.length === 0 && !placed.current) navigate({ to: "/cart" });
   }, [ready, farm.cart.length, navigate]);
-  const totals = cartTotals(farm.cart, method, catalog.settings);
+  const offer = useMemo(
+    () =>
+      cartShipping(
+        farm.cart.map((line) => {
+          const product = catalog.products.find((entry) => entry.slug === line.slug);
+          return {
+            name: product?.name ?? line.name,
+            category: product?.category ?? parseCategory(undefined, line.kind),
+            shipping: product?.shipping ?? [],
+          };
+        }),
+        catalog.shipping,
+      ),
+    [farm.cart, catalog.products, catalog.shipping],
+  );
+  const selected = offer.options.find((option) => option.slug === choice) ?? null;
+  const method: "pickup" | "ship" = selected ? "ship" : "pickup";
+  useEffect(() => {
+    if (catalog.ready && choice !== "pickup" && !selected) setChoice("pickup");
+  }, [catalog.ready, choice, selected]);
+  const totals = cartTotals(farm.cart, selected ? selected.price : 0, catalog.settings);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,12 +57,8 @@ function CheckoutPage() {
     const region = String(data.get("region") || "").trim();
     const zip = String(data.get("zip") || "").trim();
     const note = String(data.get("note") || "").trim();
-    if (method === "ship" && totals.hasBirds) {
-      setError("Live birds are pickup only. Switch to farm pickup or remove chicks.");
-      return;
-    }
-    if (method === "ship" && !street) {
-      setError("Add a shipping address for hatching eggs.");
+    if (method === "ship" && (!street || !city || !zip)) {
+      setError("Add a shipping address.");
       return;
     }
     setPending(true);
@@ -51,6 +68,7 @@ function CheckoutPage() {
         data: {
           customer: { name, email, phone },
           method,
+          shipping: selected ? selected.slug : "pickup",
           address: method === "ship" ? `${street}, ${city}, ${region} ${zip}` : "",
           note,
           items: farm.cart.map((line) => ({ slug: line.slug, variantId: line.variantId, qty: line.qty })),
@@ -87,11 +105,28 @@ function CheckoutPage() {
               <input id="phone" name="phone" required autoComplete="tel" className="mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3" />
             </div>
           </div>
-          <label className="mt-3 block text-sm font-semibold" htmlFor="method">How do you want it?</label>
-          <select id="method" className="mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3" value={method} onChange={(event) => setMethod(event.target.value as "pickup" | "ship")}>
-            <option value="pickup">Farm pickup in Shelbyville — free</option>
-            <option value="ship">Ship hatching eggs — {money(catalog.settings.shipEggs)}</option>
-          </select>
+          <fieldset className="mt-3">
+            <legend className="text-sm font-semibold">How do you want it?</legend>
+            <label className="mt-1 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-line bg-cream px-3 py-3">
+              <span className="flex items-center gap-2">
+                <input type="radio" name="shipping" value="pickup" checked={!selected} onChange={() => setChoice("pickup")} />
+                Farm pickup in Shelbyville
+              </span>
+              <strong>Free</strong>
+            </label>
+            {offer.options.map((option) => (
+              <label key={option.slug} className="mt-2 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-line bg-cream px-3 py-3">
+                <span className="flex items-center gap-2">
+                  <input type="radio" name="shipping" value={option.slug} checked={selected?.slug === option.slug} onChange={() => setChoice(option.slug)} />
+                  {option.name}
+                </span>
+                <strong>{money(option.price)}</strong>
+              </label>
+            ))}
+            {catalog.ready && offer.reason ? (
+              <p className="mt-2 rounded-xl bg-note-bg p-3 text-sm text-note" data-testid="shipping-reason">{offer.reason}</p>
+            ) : null}
+          </fieldset>
           {method === "ship" ? (
             <div>
               <label className="mt-3 block text-sm font-semibold" htmlFor="street">Street</label>
@@ -113,7 +148,6 @@ function CheckoutPage() {
           <label className="mt-3 block text-sm font-semibold" htmlFor="note">Note for the farm</label>
           <textarea id="note" name="note" rows={3} className="mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3" placeholder="Pickup day or hatch questions" />
           {error ? <p className="mt-3 rounded-xl bg-note-bg p-3 text-sm text-note">{error}</p> : null}
-          {method === "ship" && totals.hasBirds ? <p className="mt-3 rounded-xl bg-note-bg p-3 text-sm text-note">Live birds are pickup only.</p> : null}
           <button type="submit" disabled={pending} className="mt-4 inline-flex min-h-11 items-center rounded-full bg-barn px-5 font-semibold text-paper disabled:opacity-60">
             {pending ? "Placing order…" : "Place order"}
           </button>
@@ -132,7 +166,7 @@ function CheckoutPage() {
           ))}
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{money(totals.sub)}</span></div>
-            <div className="flex justify-between"><span>Shipping</span><span>{money(totals.ship)}</span></div>
+            <div className="flex justify-between"><span>{selected ? selected.name : "Farm pickup"}</span><span>{money(totals.ship)}</span></div>
             <div className="flex justify-between"><span>Tax</span><span>{money(totals.tax)}</span></div>
             <div className="flex justify-between text-lg font-semibold"><span>Due</span><span>{money(totals.total)}</span></div>
           </div>

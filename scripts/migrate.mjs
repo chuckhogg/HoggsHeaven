@@ -11,6 +11,10 @@
  *
  * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
  * the same files at startup instead (see src/lib/db.ts).
+ *
+ * Driver: Neon hosts (*.neon.tech) connect with Neon's serverless driver over a
+ * WebSocket on port 443 (works where outbound 5432 is blocked); other hosts use
+ * node-postgres. Override with MIGRATE_DB_DRIVER=pg|neon.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -42,8 +46,7 @@ async function main() {
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  const client = await pool.connect();
+  const client = await openClient(databaseUrl);
   try {
     await client.query(
       "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
@@ -75,9 +78,30 @@ async function main() {
     }
     console.log(count ? `[migrate] done — ${count} migration(s) applied.` : "[migrate] up to date.");
   } finally {
-    client.release();
-    await pool.end();
+    await client.end();
   }
+}
+
+/** One dedicated session (BEGIN … COMMIT per file) on either driver. */
+async function openClient(url) {
+  const forced = process.env.MIGRATE_DB_DRIVER?.trim().toLowerCase();
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    host = "";
+  }
+  const driver = forced === "pg" || forced === "neon" ? forced : host.endsWith(".neon.tech") ? "neon" : "pg";
+  if (driver === "neon" && typeof globalThis.WebSocket === "function") {
+    const { Client } = await import("@neondatabase/serverless");
+    const client = new Client({ connectionString: url });
+    await client.connect();
+    console.log("[migrate] using Neon's WebSocket driver (port 443)");
+    return client;
+  }
+  const client = new pg.Client({ connectionString: url });
+  await client.connect();
+  return client;
 }
 
 main().catch((err) => {

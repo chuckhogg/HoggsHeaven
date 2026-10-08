@@ -1,3 +1,5 @@
+import type { ProductCategory } from "./shipping";
+
 export type Variant = {
   id: number;
   sku: string;
@@ -12,12 +14,19 @@ export type Product = {
   slug: string;
   name: string;
   kind: "eggs" | "birds";
+  /** Hatching eggs, chicks, or adult birds (drives the default shipping methods). */
+  category: ProductCategory;
+  /** Slugs of the shipping methods this listing can go out by. Farm pickup is always allowed. */
+  shipping: string[];
   image: string;
   description: string;
   variants: Variant[];
 };
 
-export const products: Product[] = [
+/** Starter listings as imported from the GoDaddy store (category is guessed at seed time). */
+export type SeedProduct = Omit<Product, "category" | "shipping">;
+
+export const products: SeedProduct[] = [
   {
     "id": 1,
     "slug": "ayam-cemani",

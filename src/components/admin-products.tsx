@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Product } from "@/lib/catalog";
-import { deleteProduct, saveProduct } from "@/lib/shop.functions";
+import { deleteProduct, listShippingMethods, saveProduct } from "@/lib/shop.functions";
+import { categoryLabel, DEFAULT_METHODS, isOffered, PRODUCT_CATEGORIES, type ProductCategory, type ShippingMethod } from "@/lib/shipping";
 import { useCatalog } from "@/lib/use-catalog";
 import { money } from "@/lib/farm-store";
 
@@ -9,7 +10,8 @@ const field = "mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3";
 type Draft = {
   id: number;
   name: string;
-  kind: "eggs" | "birds";
+  category: ProductCategory;
+  shipping: string[];
   image: string;
   description: string;
   variants: { sku: string; label: string; price: string; compare: string; stock: string }[];
@@ -18,7 +20,8 @@ type Draft = {
 const blank = (): Draft => ({
   id: 0,
   name: "",
-  kind: "eggs",
+  category: "eggs",
+  shipping: [...DEFAULT_METHODS.eggs],
   image: "",
   description: "",
   variants: [{ sku: "", label: "", price: "", compare: "", stock: "" }],
@@ -28,7 +31,8 @@ function fromProduct(product: Product): Draft {
   return {
     id: product.id,
     name: product.name,
-    kind: product.kind,
+    category: product.category,
+    shipping: [...product.shipping],
     image: product.image,
     description: product.description,
     variants: product.variants.map((variant) => ({
@@ -46,6 +50,15 @@ export function AdminProducts() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [methods, setMethods] = useState<ShippingMethod[]>([]);
+
+  useEffect(() => {
+    void listShippingMethods()
+      .then(setMethods)
+      .catch((err: unknown) => setMessage(err instanceof Error ? err.message : "Shipping methods did not load."));
+  }, []);
+
+  const methodName = (slug: string) => methods.find((method) => method.slug === slug)?.name ?? slug;
 
   async function onSave() {
     if (!draft) return;
@@ -56,7 +69,8 @@ export function AdminProducts() {
         data: {
           id: draft.id || undefined,
           name: draft.name,
-          kind: draft.kind,
+          category: draft.category,
+          shipping: draft.shipping,
           image: draft.image,
           description: draft.description,
           variants: draft.variants.map((variant) => ({
@@ -107,7 +121,8 @@ export function AdminProducts() {
             <img src={product.image} alt="" className="size-20 rounded-xl object-cover" />
             <div>
               <strong>{product.name}</strong>
-              <p className="text-sm text-muted">{product.kind === "eggs" ? "Hatching eggs" : "Live birds"} · {product.variants.map((variant) => `${variant.label} ${money(variant.price)}`).join(" · ")}</p>
+              <p className="text-sm text-muted">{categoryLabel(product.category)} · {product.variants.map((variant) => `${variant.label} ${money(variant.price)}`).join(" · ")}</p>
+              <p className="text-sm text-muted">Ships by: {product.shipping.length ? product.shipping.map(methodName).join(", ") : "pickup only"}</p>
             </div>
             <div className="flex gap-3 sm:flex-col sm:items-end">
               <button type="button" className="font-semibold text-barn" onClick={() => setDraft(fromProduct(product))}>Edit</button>
@@ -127,11 +142,52 @@ export function AdminProducts() {
           <h3 className="text-2xl">{draft.id ? "Edit listing" : "New listing"}</h3>
           <label className="mt-3 block text-sm font-semibold" htmlFor="pname">Name</label>
           <input id="pname" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className={field} />
-          <label className="mt-3 block text-sm font-semibold" htmlFor="kind">Kind</label>
-          <select id="kind" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as Draft["kind"] })} className={field}>
-            <option value="eggs">Hatching eggs</option>
-            <option value="birds">Live birds</option>
+          <label className="mt-3 block text-sm font-semibold" htmlFor="category">Category</label>
+          <select
+            id="category"
+            value={draft.category}
+            onChange={(event) => {
+              const category = event.target.value as ProductCategory;
+              // A new listing picks up its category's usual methods; an existing one keeps its own.
+              setDraft({ ...draft, category, shipping: draft.id ? draft.shipping : [...DEFAULT_METHODS[category]] });
+            }}
+            className={field}
+          >
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category} value={category}>{categoryLabel(category)}</option>
+            ))}
           </select>
+          <fieldset className="mt-3" data-testid="listing-shipping">
+            <legend className="text-sm font-semibold">Shipping methods</legend>
+            <p className="text-sm text-muted">Farm pickup is always offered. Shoppers only see a checked method once it has a price.</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {methods.map((method) => {
+                const on = draft.shipping.includes(method.slug);
+                return (
+                  <label key={method.slug} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line bg-cream px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() =>
+                        setDraft({
+                          ...draft,
+                          shipping: on ? draft.shipping.filter((slug) => slug !== method.slug) : [...draft.shipping, method.slug],
+                        })
+                      }
+                    />
+                    <span className="flex-1">{method.name}</span>
+                    {!method.active ? (
+                      <span className="rounded-full bg-line px-2 py-0.5 text-xs">Off</span>
+                    ) : isOffered(method) ? (
+                      <span className="text-sm text-muted">{money(method.price ?? 0)}</span>
+                    ) : (
+                      <span className="rounded-full bg-note-bg px-2 py-0.5 text-xs text-note">Needs price</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <label className="mt-3 block text-sm font-semibold" htmlFor="image">Image address</label>
           <input id="image" required value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} className={field} placeholder="https://" />
           <label className="mt-3 block text-sm font-semibold" htmlFor="description">Description</label>

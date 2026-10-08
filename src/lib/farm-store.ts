@@ -27,6 +27,8 @@ export type Order = {
   created: string;
   customer: { name: string; email: string; phone: string };
   method: "pickup" | "ship";
+  /** The shipping method chosen at checkout. null for pickup and for orders from before shipping types. */
+  shippingMethod?: { slug: string; name: string } | null;
   address: string;
   // Card charges stay on Stripe or Square. No card data is ever stored here.
   payment: { type: "pay-at-pickup" };
@@ -103,12 +105,17 @@ export function cartCount(cart: CartItem[]) {
   return cart.reduce((sum, item) => sum + item.qty, 0);
 }
 
-export function cartTotals(cart: CartItem[], method: "pickup" | "ship", settings: Settings) {
+/** Cart totals for display. `shipping` is the chosen method's price (0 for farm pickup). */
+export function cartTotals(cart: CartItem[], shipping: number, settings: Pick<Settings, "taxRate">) {
   const sub = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const hasBirds = cart.some((item) => item.kind === "birds");
-  const ship = method === "ship" && !hasBirds ? settings.shipEggs : 0;
-  const tax = sub * settings.taxRate;
-  return { sub, ship, tax, total: sub + ship + tax, hasBirds };
+  const tax = Math.round(sub * settings.taxRate * 100) / 100;
+  return { sub, ship: shipping, tax, total: sub + shipping + tax };
+}
+
+/** How an order goes out, in words: "Farm pickup", "USPS Priority Mail", or "Shipped" for older orders. */
+export function fulfillmentLabel(order: Pick<Order, "method" | "shippingMethod">) {
+  if (order.method === "pickup") return "Farm pickup";
+  return order.shippingMethod?.name ?? "Shipped";
 }
 
 export function addToCart(item: Omit<CartItem, "key">) {

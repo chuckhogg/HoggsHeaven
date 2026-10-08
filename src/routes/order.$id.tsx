@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Shell } from "@/components/shell";
-import { hydrateFarm, money, saveReceipt, statusLabel, useFarm } from "@/lib/farm-store";
+import { fulfillmentLabel, hydrateFarm, money, saveReceipt, statusLabel, useFarm } from "@/lib/farm-store";
 import { trackOrder } from "@/lib/shop.functions";
 
 export const Route = createFileRoute("/order/$id")({ component: OrderPage });
@@ -81,9 +81,11 @@ export function OrderBody({ id, email }: { id: string; email?: string }) {
               <span>{money(line.price * line.qty)}</span>
             </div>
           ))}
-          <div className="mt-3 flex justify-between font-semibold"><span>Total</span><span>{money(order.totals.total)}</span></div>
+          <div className="mt-3 flex justify-between text-sm"><span>{fulfillmentLabel(order)}</span><span>{money(order.totals.ship)}</span></div>
+          {order.totals.tax ? <div className="flex justify-between text-sm"><span>Tax</span><span>{money(order.totals.tax)}</span></div> : null}
+          <div className="mt-1 flex justify-between font-semibold"><span>Total</span><span>{money(order.totals.total)}</span></div>
           <p className="mt-2 text-sm text-muted">
-            {order.status === "awaiting-payment" ? "Payment due at pickup or by invoice." : "Payment recorded by the farm."} No card number is stored. · {order.method === "ship" ? "Ship" : "Pickup"}
+            {order.status === "awaiting-payment" ? "Payment due at pickup or by invoice." : "Payment recorded by the farm."} No card number is stored. · {fulfillmentLabel(order)}
           </p>
           <p className="text-sm">{order.address}</p>
           <button type="button" className="mt-3 text-sm font-semibold text-barn" onClick={() => window.print()}>Print receipt</button>

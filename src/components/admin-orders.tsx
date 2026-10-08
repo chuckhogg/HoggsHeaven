@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Order, OrderStatus } from "@/lib/farm-store";
-import { money, ORDER_STATUSES, statusLabel } from "@/lib/farm-store";
-import { deleteOrder, listAdminOrders, saveOrder, saveShopSettings } from "@/lib/shop.functions";
+import { fulfillmentLabel, money, ORDER_STATUSES, statusLabel } from "@/lib/farm-store";
+import { deleteOrder, listAdminOrders, listShippingMethods, saveOrder, saveShopSettings } from "@/lib/shop.functions";
+import type { ShippingMethod } from "@/lib/shipping";
 import { useCatalog } from "@/lib/use-catalog";
 
 const field = "mt-1 w-full rounded-xl border border-line bg-cream px-3 py-3";
@@ -13,7 +14,8 @@ type Draft = {
   name: string;
   email: string;
   phone: string;
-  method: "pickup" | "ship";
+  /** "pickup", a shipping method slug, or "legacy-ship" for an older order whose method was never recorded. */
+  shipping: string;
   address: string;
   status: OrderStatus;
   note: string;
@@ -30,7 +32,7 @@ function fromOrder(order: Order): Draft {
     name: order.customer.name,
     email: order.customer.email,
     phone: order.customer.phone,
-    method: order.method,
+    shipping: order.method === "pickup" ? "pickup" : order.shippingMethod?.slug ?? "legacy-ship",
     address: order.address,
     status: order.status,
     note: order.note,
@@ -53,8 +55,8 @@ export function AdminOrders() {
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [message, setMessage] = useState("");
-  const [shipEggs, setShipEggs] = useState("18");
   const [taxRate, setTaxRate] = useState("0");
+  const [methods, setMethods] = useState<ShippingMethod[]>([]);
 
   async function reload() {
     const next = await listAdminOrders();
@@ -64,10 +66,10 @@ export function AdminOrders() {
 
   useEffect(() => {
     void reload().catch((err: unknown) => setMessage(err instanceof Error ? err.message : "Orders did not load."));
+    void listShippingMethods().then(setMethods).catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    setShipEggs(String(catalog.settings.shipEggs));
     setTaxRate(String(catalog.settings.taxRate));
   }, [catalog.settings]);
 
@@ -81,7 +83,7 @@ export function AdminOrders() {
           name: draft.name,
           email: draft.email,
           phone: draft.phone,
-          method: draft.method,
+          shipping: draft.shipping,
           address: draft.address,
           status: draft.status,
           note: draft.note,
@@ -119,31 +121,28 @@ export function AdminOrders() {
         className="mt-4 rounded-card border border-line bg-paper p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          void saveShopSettings({ data: { shipEggs: Number(shipEggs), taxRate: Number(taxRate) } })
+          void saveShopSettings({ data: { taxRate: Number(taxRate) } })
             .then(() => catalog.reload())
-            .then(() => setMessage("Shipping and tax saved."))
+            .then(() => setMessage("Tax rate saved."))
             .catch((err: unknown) => setMessage(err instanceof Error ? err.message : "Settings did not save."));
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-semibold" htmlFor="ship">Egg shipping flat rate</label>
-            <input id="ship" type="number" min={0} step="0.01" value={shipEggs} onChange={(event) => setShipEggs(event.target.value)} className={field} />
-          </div>
-          <div>
             <label className="text-sm font-semibold" htmlFor="tax">Tax rate (0.06 = 6%)</label>
             <input id="tax" type="number" min={0} max={0.25} step="0.001" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className={field} />
           </div>
+          <p className="self-end text-sm text-muted">Shipping prices are set per method on the Shipping tab.</p>
         </div>
         <p className="mt-3 rounded-xl bg-note-bg p-3 text-sm text-note">
           Card numbers, expiration dates, and security codes are not collected or stored. Take a card on Stripe or Square, then mark the order paid here.
         </p>
-        <button type="submit" className="mt-3 inline-flex min-h-11 items-center rounded-full border border-ink px-5 font-semibold">Save rates</button>
+        <button type="submit" className="mt-3 inline-flex min-h-11 items-center rounded-full border border-ink px-5 font-semibold">Save tax rate</button>
       </form>
       <button
         type="button"
         className="mt-4 inline-flex min-h-11 items-center rounded-full bg-barn px-5 font-semibold text-paper"
-        onClick={() => setDraft({ id: "", name: "", email: "", phone: "", method: "pickup", address: "", status: "awaiting-payment", note: "", items: [blankLine()] })}
+        onClick={() => setDraft({ id: "", name: "", email: "", phone: "", shipping: "pickup", address: "", status: "awaiting-payment", note: "", items: [blankLine()] })}
       >
         Add order
       </button>
@@ -157,7 +156,7 @@ export function AdminOrders() {
               <div>
                 <strong>{order.id}</strong>
                 <p className="text-sm text-muted">{new Date(order.created).toLocaleString()} · {order.customer.name} · {order.customer.email}</p>
-                <p className="text-sm">{statusLabel(order.status)} · {money(order.totals.total)} · {order.method === "ship" ? "Ship" : "Pickup"}</p>
+                <p className="text-sm">{statusLabel(order.status)} · {money(order.totals.total)} · {fulfillmentLabel(order)}{order.totals.ship ? ` ${money(order.totals.ship)}` : ""}</p>
               </div>
               <div className="flex gap-3">
                 <button type="button" className="font-semibold text-barn" onClick={() => setDraft(fromOrder(order))}>Edit</button>
@@ -196,9 +195,16 @@ export function AdminOrders() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mt-3 block text-sm font-semibold" htmlFor="method">Fulfillment</label>
-              <select id="method" value={draft.method} onChange={(event) => setDraft({ ...draft, method: event.target.value as Draft["method"] })} className={field}>
-                <option value="pickup">Farm pickup</option>
-                <option value="ship">Ship hatching eggs</option>
+              <select id="method" value={draft.shipping} onChange={(event) => setDraft({ ...draft, shipping: event.target.value })} className={field}>
+                <option value="pickup">Farm pickup — free</option>
+                {draft.shipping === "legacy-ship" ? <option value="legacy-ship">Shipped (method not recorded)</option> : null}
+                {methods
+                  .filter((method) => method.slug === draft.shipping || (method.active && method.price != null))
+                  .map((method) => (
+                    <option key={method.slug} value={method.slug}>
+                      {method.name} — {method.price == null ? "needs price" : money(method.price)}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
@@ -210,10 +216,11 @@ export function AdminOrders() {
               </select>
             </div>
           </div>
-          {draft.method === "ship" ? (
+          {draft.shipping !== "pickup" || draft.id ? (
             <>
               <label className="mt-3 block text-sm font-semibold" htmlFor="address">Address</label>
               <input id="address" value={draft.address} onChange={(event) => setDraft({ ...draft, address: event.target.value })} className={field} />
+              {draft.id ? <p className="mt-1 text-xs text-muted">Saving keeps the stored address unless you change it here. Shipping and tax stay as stored unless the lines or the method change.</p> : null}
             </>
           ) : null}
           <label className="mt-3 block text-sm font-semibold" htmlFor="note">Note</label>

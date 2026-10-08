@@ -12,7 +12,7 @@ function CartPage() {
     hydrateFarm();
     setReady(true);
   }, []);
-  const totals = cartTotals(farm.cart, "pickup", farm.settings);
+  const totals = cartTotals(farm.cart, 0, farm.settings);
   return (
     <Shell>
       <h1 className="text-4xl">Cart</h1>

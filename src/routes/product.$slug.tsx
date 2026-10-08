@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { addToCart, money } from "@/lib/farm-store";
 import { useCatalog } from "@/lib/use-catalog";
 import { Shell } from "@/components/shell";
+import { categoryLabel, isOffered } from "@/lib/shipping";
 
 export const Route = createFileRoute("/product/$slug")({ component: ProductPage });
 
 function ProductPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
-  const { products, ready } = useCatalog();
+  const { products, shipping, ready } = useCatalog();
   const product = products.find((item) => item.slug === slug);
   const first = product?.variants.find((variant) => variant.stock !== 0) ?? product?.variants[0];
   const [variantId, setVariantId] = useState(0);
@@ -30,13 +31,14 @@ function ProductPage() {
   }
   const variant = product.variants.find((item) => item.id === variantId) ?? first;
   const sold = variant.stock === 0;
+  const shipsBy = shipping.filter((method) => product.shipping.includes(method.slug) && isOffered(method));
   return (
     <Shell>
       <div className="grid gap-8 md:grid-cols-2">
         <img src={product.image} alt={product.name} className="w-full rounded-card object-cover md:h-[32rem]" />
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-barn">
-            {product.kind === "eggs" ? "Hatching eggs" : "Live birds"}
+            {categoryLabel(product.category)}
           </p>
           <h1 className="mt-2 text-4xl">{product.name}</h1>
           <p className="mt-3 text-2xl font-semibold">
@@ -94,6 +96,16 @@ function ProductPage() {
           >
             {sold ? "Sold out" : "Add to cart"}
           </button>
+          <div className="mt-6 rounded-xl border border-line bg-paper p-3 text-sm" data-testid="ships-by">
+            <p className="font-semibold">Pickup and shipping</p>
+            <ul className="mt-1 space-y-1">
+              <li className="flex justify-between gap-3"><span>Farm pickup in Shelbyville</span><span>Free</span></li>
+              {shipsBy.map((method) => (
+                <li key={method.slug} className="flex justify-between gap-3"><span>{method.name}</span><span>{money(method.price ?? 0)}</span></li>
+              ))}
+            </ul>
+            {shipsBy.length === 0 ? <p className="mt-1 text-muted">Shipping isn't available for this listing yet. Call 502-435-6649 to ask.</p> : null}
+          </div>
           <p className="mt-6 whitespace-pre-wrap text-muted">{product.description}</p>
         </div>
       </div>

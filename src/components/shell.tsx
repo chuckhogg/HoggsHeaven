@@ -25,7 +25,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-cream text-ink">
       <div className="bg-ink text-cream">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
-          <span>Shelbyville, Kentucky · Hatching eggs ship · Birds are farm pickup</span>
+          <span>Shelbyville, Kentucky · Farm pickup or USPS/UPS shipping</span>
           <a className="inline-flex items-center gap-2" href="tel:+15024356649">
             <Phone className="size-4" aria-hidden />
             502-435-6649

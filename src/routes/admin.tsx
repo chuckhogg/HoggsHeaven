@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AdminOrders } from "@/components/admin-orders";
 import { AdminProducts } from "@/components/admin-products";
+import { AdminShipping } from "@/components/admin-shipping";
 import { Shell } from "@/components/shell";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -29,7 +30,7 @@ function AdminPage() {
 }
 
 function Desk() {
-  const [tab, setTab] = useState<"orders" | "listings">("orders");
+  const [tab, setTab] = useState<"orders" | "listings" | "shipping">("orders");
   const [state, setState] = useState<"loading" | "claim" | "refused" | "denied" | "open">("loading");
   const [error, setError] = useState("");
   const [refusal, setRefusal] = useState("");
@@ -84,8 +85,9 @@ function Desk() {
           <div className="flex gap-2">
             <button type="button" className={tab === "orders" ? "inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-paper" : "inline-flex min-h-11 items-center rounded-full border border-line bg-paper px-4"} onClick={() => setTab("orders")}>Orders</button>
             <button type="button" className={tab === "listings" ? "inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-paper" : "inline-flex min-h-11 items-center rounded-full border border-line bg-paper px-4"} onClick={() => setTab("listings")}>Listings</button>
+            <button type="button" className={tab === "shipping" ? "inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-paper" : "inline-flex min-h-11 items-center rounded-full border border-line bg-paper px-4"} onClick={() => setTab("shipping")}>Shipping</button>
           </div>
-          <div className="mt-6">{tab === "orders" ? <AdminOrders /> : <AdminProducts />}</div>
+          <div className="mt-6">{tab === "orders" ? <AdminOrders /> : tab === "listings" ? <AdminProducts /> : <AdminShipping />}</div>
         </div>
       ) : null}
     </div>

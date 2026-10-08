@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import type { Product } from "@/lib/catalog";
 import { listShop, type ShopSettings } from "@/lib/shop.functions";
+import type { ShippingMethod } from "@/lib/shipping";
 
 const FALLBACK: ShopSettings = { shipEggs: 18, taxRate: 0 };
 
 export function useCatalog() {
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<ShopSettings>(FALLBACK);
+  const [shipping, setShipping] = useState<ShippingMethod[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
@@ -14,6 +16,7 @@ export function useCatalog() {
     const next = await listShop();
     setProducts(next.products);
     setSettings(next.settings);
+    setShipping(next.shipping);
     setReady(true);
     setError("");
     return next;
@@ -26,6 +29,7 @@ export function useCatalog() {
         if (!live) return;
         setProducts(next.products);
         setSettings(next.settings);
+        setShipping(next.shipping);
         setReady(true);
       })
       .catch(() => {
@@ -36,5 +40,5 @@ export function useCatalog() {
     };
   }, []);
 
-  return { products, settings, ready, error, reload };
+  return { products, settings, shipping, ready, error, reload };
 }

@@ -50,7 +50,7 @@ function Home() {
           ["23", "listings from the farm store"],
           ["100%", "of published reviews recommend"],
           ["5 acres", "Shelby County, Kentucky"],
-          ["Pickup", "or shipped hatching eggs"],
+          ["Pickup", "or shipped by USPS and UPS"],
         ].map(([title, detail]) => (
           <div key={title} className="rounded-card border border-line bg-paper p-4">
             <b className="block font-display text-3xl">{title}</b>
