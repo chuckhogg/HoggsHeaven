@@ -17,3 +17,7 @@ screenshots
 # Cloudflare / wrangler local state and secrets
 .wrangler
 .dev.vars*
+.neon
+
+# Neon agent skills lockfile (the skills themselves install under .grok/, which is ignored)
+skills-lock.json
