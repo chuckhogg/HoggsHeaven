@@ -1,9 +1,10 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
-import { GROK_PROVIDERS, authEnabled, signIn, signOut } from "./client";
+import { authEnabled, signOut, startSignIn } from "./client";
 import { hasGateSessionMarker } from "./gate-session-marker";
 import { resolveSignInGateState } from "./sign-in-gate";
 import { useCurrentUser, useCurrentUserState } from "./use-current-user";
+import { useSignInOptions } from "./use-sign-in-options";
 
 const subscribeToNothing = () => () => {};
 const noGateSessionOnServer = () => false;
@@ -63,14 +64,16 @@ export function SignInGate({
   return <>{fallback ?? <SignInButtons />}</>;
 }
 
+/** One button per sign-in method this deployment can finish (see `./sign-in-options`). */
 export function SignInButtons() {
+  const { options } = useSignInOptions();
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
-      {GROK_PROVIDERS.map((p) => (
+      {options.map((p) => (
         <button
-          key={p.providerId}
+          key={p.id}
           type="button"
-          onClick={() => signIn(p.providerId, { callbackURL: "/" })}
+          onClick={() => void startSignIn(p, { callbackURL: "/" })}
           className="w-full cursor-pointer rounded-md border border-neutral-300 px-4 py-2 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
         >
           Continue with {p.label}

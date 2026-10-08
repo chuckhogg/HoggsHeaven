@@ -223,6 +223,21 @@ describe("claimDesk / adminState against the database", () => {
     assert.equal(await deskOwnerId(sql), "owner");
   });
 
+  it("chuckhogg@gmail.com signed in with Google directly (Google-verified) can claim", async () => {
+    await addUser(pg, { id: "chuck", email: "chuckhogg@gmail.com", emailVerified: true, providerId: "google" });
+    const env = { ...deployed, FARM_OWNER_EMAILS: "chuckhogg@gmail.com" };
+    assert.equal((await deskStateFor(sql, "chuck", env)).canClaim, true);
+    assert.deepEqual(await claimDeskFor(sql, "chuck", env), { ok: true });
+    assert.equal(await deskOwnerId(sql), "chuck");
+  });
+
+  it("an allow-listed direct-Google account whose email Google did not verify cannot claim", async () => {
+    await addUser(pg, { id: "chuck", email: "chuckhogg@gmail.com", emailVerified: false, providerId: "google" });
+    const env = { ...deployed, FARM_OWNER_EMAILS: "chuckhogg@gmail.com" };
+    await assert.rejects(() => claimDeskFor(sql, "chuck", env), /not verified/);
+    assert.equal(await deskOwnerId(sql), null);
+  });
+
   it("local dev without an allowlist keeps the old first-claim behavior", async () => {
     assert.deepEqual(await claimDeskFor(sql, "dev-user", {}), { ok: true });
     assert.equal(await deskOwnerId(sql), "dev-user");

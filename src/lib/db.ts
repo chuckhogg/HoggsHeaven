@@ -1,5 +1,5 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { pgPoolConfig } from "./pg-config";
+import { createPgPool, setPgTypeParsers } from "./pg-config";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -88,13 +88,16 @@ function toSql(run: Run): Sql {
 
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-    // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool(pgPoolConfig(databaseUrl));
+    // Node (local / Vercel): node-postgres' shared pool on Neon's pooled
+    // endpoint. Cloudflare Workers: Neon's serverless driver, one small
+    // WebSocket pool per request (see ./pg-config), so a page's queries share
+    // a connection instead of opening one subrequest each.
+    setPgTypeParsers({
+      [OID_INT8]: Number,
+      [OID_DATE]: identity,
+      [OID_INTERVAL]: identity,
+    });
+    const pool = createPgPool(databaseUrl as string);
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

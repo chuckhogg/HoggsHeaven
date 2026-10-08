@@ -11,6 +11,12 @@
  * app only holds its own client id/secret and names the upstream it wants via
  * each provider's `idp` hint.
  *
+ * Hogg's Heaven also signs in with **Google directly** (Better Auth's built-in
+ * `socialProviders.google`) using the farm's own Google Cloud OAuth client when
+ * `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` are set. That replaces the broker's
+ * Google, and broker buttons are dropped on a deployed domain that has no
+ * per-app broker client. See `./sign-in-options`.
+ *
  * Tri-mode:
  *   - Deployed: the deployer injects a per-app `GROK_AUTH_*` + `BETTER_AUTH_URL`
  *     + `DATABASE_URL`, so real federated auth is persisted in Postgres.
@@ -34,13 +40,12 @@ import { bearer, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
-import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
-import { pgPoolConfig } from "../pg-config";
+import { createPgPool } from "../pg-config";
 import { emailAndPasswordEnabled } from "./email-password";
 import { farmAccountLinking, passwordSignUpAllowed } from "./farm-access";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
-import { GROK_PROVIDERS } from "./providers";
+import { brokerProvidersFor, farmSocialProviders, googleOAuthCredentials } from "./sign-in-options";
 import { pgliteDialect } from "./pglite-dialect";
 import {
   GROK_ISSUER_DEFAULT,
@@ -83,9 +88,17 @@ const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
 
+// The farm's own Google Cloud OAuth client (GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET),
+// or null unless both are set. See `./sign-in-options`.
+const googleCredentials = googleOAuthCredentials(process.env);
+
+// Broker providers that can actually complete here: none on a deployed domain
+// without a per-app broker client, and no broker Google when Google is direct.
+const brokerProviders = brokerProvidersFor(process.env);
+
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
-  !authDisabled && Boolean(grokClientId && grokClientSecret);
+  !authDisabled && (Boolean(grokClientId && grokClientSecret) || googleCredentials !== null);
 
 // This app's own Better Auth origin. When deployed the deployer injects the
 // public URL. In the sandbox live preview there's no fixed URL (each preview gets
@@ -144,7 +157,7 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 // schema from `migrations/auth/0001_auth.sql`, copied into `migrations/` when
 // the app turns sign-in on.
 const database = databaseUrl
-  ? new Pool(pgPoolConfig(databaseUrl))
+  ? createPgPool(databaseUrl)
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
@@ -152,9 +165,10 @@ export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 
 // Built separately so the `betterAuth({...})` call stays easy to edit without
 // breaking brackets (models often trip on the conditional plugin spread).
-const grokOAuthPlugin = authConfigured
+const grokOAuthPlugin =
+  !authDisabled && grokClientId && grokClientSecret && brokerProviders.length > 0
   ? genericOAuth({
-      config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
+      config: brokerProviders.map(({ providerId, idp }) => ({
         providerId,
         clientId: grokClientId as string,
         clientSecret: grokClientSecret as string,
@@ -202,6 +216,12 @@ export const auth = betterAuth({
   // window and reduces auth flicker. See the `auth` skill for the full
   // flicker-prevention guidance (gate on `isPending`; SSR the session).
   session: { cookieCache: { enabled: true, maxAge: 300 } },
+
+  // Google, directly with the farm's own Google Cloud OAuth client (only when
+  // both env vars are set). Callback: `${BETTER_AUTH_URL}/api/auth/callback/google`.
+  // Google's `email_verified` claim becomes the user's `emailVerified`, which
+  // the account-linking and desk-claim rules in `./farm-access` rely on.
+  socialProviders: farmSocialProviders(process.env),
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
   // Deployed stores refuse NEW password accounts (no mailer to verify them, so
@@ -261,3 +281,4 @@ export function readSessionToken(): string | null {
 // Re-exported for convenience; the array lives in the dependency-free
 // `providers.ts` so the client can import it too.
 export { GROK_PROVIDERS } from "./providers";
+export { signInOptions } from "./sign-in-options";

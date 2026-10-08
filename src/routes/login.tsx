@@ -1,10 +1,26 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Shell } from "@/components/shell";
-import { GROK_PROVIDERS, authClient, signIn } from "@/lib/auth/client";
+import { authClient, startSignIn } from "@/lib/auth/client";
+import type { SignInOption } from "@/lib/auth/sign-in-options";
+import { getSignInOptions } from "@/lib/auth/sign-in-options.functions";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
-export const Route = createFileRoute("/login")({ component: LoginPage });
+export const Route = createFileRoute("/login")({
+  // Only methods this deployment can finish (e.g. Google once GOOGLE_CLIENT_ID +
+  // GOOGLE_CLIENT_SECRET are set). A failed lookup shows no provider buttons.
+  loader: async (): Promise<SignInOption[]> => getSignInOptions().catch(() => []),
+  component: LoginPage,
+});
+
+/** Better Auth sends OAuth failures back as `?error=<code>`. */
+function oauthErrorMessage(code: string): string {
+  if (code === "account_not_linked") {
+    return "That Google account's email already belongs to a login that isn't verified, so it was not linked. Contact the farm to sort it out.";
+  }
+  if (code === "access_denied") return "Google sign-in was cancelled.";
+  return "Sign-in did not finish. Please try again.";
+}
 
 function LoginPage() {
   const { user, isPending } = useCurrentUserState();
@@ -12,6 +28,13 @@ function LoginPage() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const signInOptions = Route.useLoaderData();
+  const hasGoogle = signInOptions.some((option) => option.label === "Google");
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code) setError(oauthErrorMessage(code));
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,21 +87,28 @@ function LoginPage() {
           <button type="button" className="mt-3 text-sm font-semibold text-barn" onClick={() => { setMode(mode === "up" ? "in" : "up"); setError(""); }}>
             {mode === "up" ? "I already have a login" : "First time? Create the desk login"}
           </button>
-        ) : (
+        ) : hasGoogle ? (
           <p className="mt-3 text-sm text-muted">First time here? Use Continue with Google below.</p>
-        )}
-        <div className="mt-5 space-y-2">
-          {GROK_PROVIDERS.map((provider) => (
-            <button
-              key={provider.providerId}
-              type="button"
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-cream px-4 font-semibold"
-              onClick={() => signIn(provider.providerId, { callbackURL: "/admin" })}
-            >
-              Continue with {provider.label}
-            </button>
-          ))}
-        </div>
+        ) : null}
+        {signInOptions.length > 0 ? (
+          <div className="mt-5 space-y-2">
+            {signInOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-cream px-4 font-semibold"
+                onClick={() => {
+                  setError("");
+                  startSignIn(option, { callbackURL: "/admin", errorCallbackURL: "/login" }).catch((err: unknown) => {
+                    setError(err instanceof Error ? err.message : "Could not start sign-in.");
+                  });
+                }}
+              >
+                Continue with {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Shell>
   );

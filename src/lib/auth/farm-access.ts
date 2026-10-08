@@ -75,6 +75,16 @@ export function parseOwnerEmails(raw: string | undefined): string[] {
  */
 export const VERIFIED_EMAIL_PROVIDERS: readonly string[] = ["grok-google"];
 
+/*
+ * Direct Google (`providerId: "google"`, the farm's own Google Cloud client) is
+ * deliberately NOT listed above. Better Auth copies Google's own
+ * `email_verified` claim into the sign-in, so a Google address Google has
+ * verified still links into a verified local user and creates verified users,
+ * while one Google itself has not verified is treated as unverified: it cannot
+ * link into an existing account and cannot claim the desk. Trusting the
+ * provider by name would skip that claim check.
+ */
+
 /**
  * Better Auth `account.accountLinking` options.
  *

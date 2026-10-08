@@ -6,7 +6,7 @@
 //   wrangler pages deploy dist --project-name hoggsheaven --branch dev-preview
 //
 // Secrets live only in Cloudflare (`wrangler pages secret put <NAME> --project-name hoggsheaven`):
-//   BETTER_AUTH_SECRET (set), DATABASE_URL, GROK_AUTH_CLIENT_ID, GROK_AUTH_CLIENT_SECRET (not set yet).
+//   BETTER_AUTH_SECRET, DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (the farm's Google Cloud OAuth client).
 {
   "name": "hoggsheaven",
   "pages_build_output_dir": "./dist",

@@ -153,6 +153,43 @@ export async function signIn(
 }
 
 /**
+ * Start sign-in with a Better Auth built-in social provider (Hogg's Heaven:
+ * `"google"`, the farm's own Google Cloud OAuth client). A full-page redirect
+ * to Google and back to `/api/auth/callback/google`; there is no live-preview
+ * popup path because the Google client only accepts the store's own domain.
+ *
+ * Like `signIn`, it ends any existing local session first so switching
+ * accounts really switches identity.
+ */
+export async function signInSocial(
+  provider: string,
+  opts: { callbackURL?: string; errorCallbackURL?: string } = {},
+): Promise<void> {
+  await runPreSignInSignOut({
+    livePreview: inLivePreview(),
+    hasBearer: Boolean(getBearerToken()),
+    requestSignOut: () => authClient.signOut(),
+    clearToken: () => setBearerToken(null),
+  });
+  const { data, error } = await authClient.signIn.social({
+    provider,
+    callbackURL: opts.callbackURL ?? "/",
+    errorCallbackURL: opts.errorCallbackURL ?? "/",
+    disableRedirect: true,
+  });
+  if (error) throw new Error(error.message ?? "Sign-in failed");
+  if (data?.url) window.location.href = data.url;
+}
+
+/** Start sign-in for one option from `getSignInOptions()` (direct social or broker). */
+export function startSignIn(
+  option: { id: string; kind: "social" | "broker" },
+  opts: { callbackURL?: string; errorCallbackURL?: string } = {},
+): Promise<void> {
+  return option.kind === "social" ? signInSocial(option.id, opts) : signIn(option.id, opts);
+}
+
+/**
  * Open `/auth/popup` in a new window. Must run synchronously inside the click
  * handler (no await before this). The path is served by the template Vite
  * plugin (`authPopupPlugin` in vite.config.ts) — NOT by a React route.

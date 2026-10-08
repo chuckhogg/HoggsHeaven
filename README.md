@@ -14,13 +14,15 @@ Catalog and photos come from the live farm listings. Live birds are farm pickup 
 
 The desk at `/admin` manages listings and orders. Sign in at `/login` with **Continue with Google**.
 
-- **Who can claim the desk:** the first claim must come from a signed-in account with a **verified** email that is on the `FARM_OWNER_EMAILS` list. A Google sign-in counts as verified. Once claimed, the desk belongs to that one account and every other account sees "This farm desk belongs to another account."
+**Google sign-in** uses the farm's own Google Cloud OAuth client (Better Auth's built-in Google provider) whenever `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are both set. The Google client must list the store's origin (`https://dev.hoggsheaven.farm`) and its redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google` (`https://dev.hoggsheaven.farm/api/auth/callback/google`). `/login` only shows a "Continue with …" button for a method that can finish where the site runs (`src/lib/auth/sign-in-options.ts`): Google when it is configured, and the Grok sign-in broker's buttons only in the sandbox preview or with a per-app broker client. With Google configured directly, the broker's Google button is dropped.
+
+- **Who can claim the desk:** the first claim must come from a signed-in account with a **verified** email that is on the `FARM_OWNER_EMAILS` list. A Google sign-in counts as verified when Google itself marks the address verified (its `email_verified` claim). Once claimed, the desk belongs to that one account and every other account sees "This farm desk belongs to another account."
 - **Deployed store with no `FARM_OWNER_EMAILS`:** nobody can claim the desk. Set the variable first.
 - **Local dev and the sandbox preview with no `FARM_OWNER_EMAILS`:** the first signed-in account can claim, like before. That database is throwaway.
-- **Google, X, and password accounts are never merged by email unless the existing account's email is verified.** X emails are placeholders, so an X sign-in never joins another account.
+- **Google, X, and password accounts are never merged by email unless the existing account's email is verified.** A direct Google sign-in also only joins an existing account when Google says its email is verified. X emails are placeholders, so an X sign-in never joins another account.
 - **Email/password sign-up is turned off on a deployed store.** The app has no email sender to verify a new address, so a sign-up could only reserve someone else's email. It still works in local dev for testing.
 
-The rules live in `src/lib/auth/farm-access.ts`. Their tests are in `src/lib/auth/account-linking.test.ts` and `src/lib/desk-access.test.ts`.
+The rules live in `src/lib/auth/farm-access.ts`. Their tests are in `src/lib/auth/account-linking.test.ts`, `src/lib/auth/google-sign-in.test.ts` and `src/lib/desk-access.test.ts`.
 
 ## Environment variables
 
@@ -28,7 +30,8 @@ The rules live in `src/lib/auth/farm-access.ts`. Their tests are in `src/lib/aut
 | --- | --- | --- |
 | `FARM_OWNER_EMAILS` | Deployed (required to open the desk) | Comma-separated emails allowed to claim the desk, e.g. the farm's Google account. Case doesn't matter. |
 | `DATABASE_URL` | Deployed | Postgres connection. Its presence also marks the store as deployed. |
-| `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GROK_AUTH_ISSUER`, `GROK_AUTH_CLIENT_ID`, `GROK_AUTH_CLIENT_SECRET` | Deployed | Sign-in. Injected by the deployer. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Deployed (secret) | The farm's Google Cloud OAuth client for Continue with Google. Both must be set, or Google is off. |
+| `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GROK_AUTH_ISSUER`, `GROK_AUTH_CLIENT_ID`, `GROK_AUTH_CLIENT_SECRET` | Deployed | Sign-in. Injected by the deployer. The `GROK_AUTH_*` broker client is optional once Google is configured directly. |
 
 A store counts as deployed when `DATABASE_URL` or `GROK_PROJECT_ID` is set, or `NODE_ENV=production`.
 
@@ -45,7 +48,7 @@ npm run lint
 npm run build
 ```
 
-A real Google sign-in through the shared preview sign-in client only works on a `*.grok-sandbox.com` preview host, because that client is registered only for `https://*.grok-sandbox.com/api/auth/oauth2/callback/*` (see `src/lib/auth/preview.ts`). On `localhost`, the Google button still reaches the sign-in broker, but its return address is `http://localhost:8080/...`, which that client doesn't allow. A deployed store uses its own sign-in client and `BETTER_AUTH_URL` instead.
+A real Google sign-in through the shared preview sign-in client only works on a `*.grok-sandbox.com` preview host, because that client is registered only for `https://*.grok-sandbox.com/api/auth/oauth2/callback/*` (see `src/lib/auth/preview.ts`). On `localhost`, the Google button still reaches the sign-in broker, but its return address is `http://localhost:8080/...`, which that client doesn't allow. A deployed store uses `BETTER_AUTH_URL` and, for Google, the farm's own Google client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) instead. That client only accepts the redirect URIs registered on it in Google Cloud, so add `http://localhost:8080/api/auth/callback/google` there too if you want to test Google locally.
 
 ## Dev site on Cloudflare Pages
 
@@ -56,10 +59,10 @@ npm run build:cloudflare-dev        # NITRO_PRESET=cloudflare-pages SITE_NOINDEX
 wrangler pages deploy dist --project-name hoggsheaven --branch dev-preview
 ```
 
-`wrangler.jsonc` holds the Pages settings (`nodejs_compat`) and the plain variables (`NODE_ENV=production`, `BETTER_AUTH_URL`, `FARM_OWNER_EMAILS`). Secrets are set only in Cloudflare with `wrangler pages secret put <NAME> --project-name hoggsheaven`: `BETTER_AUTH_SECRET` now, and `DATABASE_URL`, `GROK_AUTH_CLIENT_ID` and `GROK_AUTH_CLIENT_SECRET` once they exist.
+`wrangler.jsonc` holds the Pages settings (`nodejs_compat`) and the plain variables (`NODE_ENV=production`, `BETTER_AUTH_URL`, `FARM_OWNER_EMAILS`). Secrets are set only in Cloudflare with `wrangler pages secret put <NAME> --project-name hoggsheaven`: `BETTER_AUTH_SECRET`, `DATABASE_URL`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
-- **Database:** the Workers runtime can't run the in-memory PGLite fallback, so the shop, checkout, order tracking and sign-in need a real Postgres `DATABASE_URL` (for example Neon). Run `npm run db:migrate` against it first. On Workers each query opens its own connection (`src/lib/pg-config.ts`), because Workers won't reuse a socket across requests.
-- **Google sign-in:** needs a Grok auth client registered for `https://dev.hoggsheaven.farm/api/auth/oauth2/callback/grok-google`. The built-in preview client only accepts `*.grok-sandbox.com`.
+- **Database:** the Workers runtime can't run the in-memory PGLite fallback, so the shop, checkout, order tracking and sign-in need a real Postgres `DATABASE_URL` (for example Neon). Run `npm run db:migrate` against it first. On Workers the app uses Neon's serverless driver (`@neondatabase/serverless`) over WebSockets, with one small pool per request (at most 4 connections, `src/lib/pg-config.ts`). Workers won't reuse a socket across requests, and each WebSocket is a single subrequest however many queries run over it, so a page stays well under the free plan's 50-subrequest limit. Node (local, Vercel, scripts) keeps node-postgres' normal shared pool.
+- **Google sign-in:** set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as Pages secrets (see Farm desk above). Without them `/login` shows no provider buttons on the dev site.
 
 ## Importing historical orders
 
